@@ -15,7 +15,7 @@ Replica lo stile visivo delle app di messaggistica più diffuse (Signal e WhatsA
 *   **Doppio Stile**:
     *   **Signal**: Tema autentico blu/bianco con avatar rotondi.
     *   **WhatsApp**: Classico stile con bolle e sfondo predefinito.
-*   **Ricerca HTML (Premium)**: Barra di ricerca integrata nel report HTML per filtrare le chat o cercare messaggi specifici istantaneamente.
+*   **Ricerca HTML**: Barra di ricerca integrata nel report HTML per filtrare le chat o cercare messaggi specifici istantaneamente.
 *   **Ricerca Avanzata**: Trova messaggi, parole chiave e traduzioni, evidenziandoli e scorrendo direttamente al punto esatto della conversazione.
 *   **Supporto Media**: Gestisce immagini, video e allegati audio se presenti nell'esportazione.
 *   **Parsing Intelligente**: Rileva automaticamente i partecipanti "Proprietario" e "Contatto" dalle intestazioni Cellebrite.
