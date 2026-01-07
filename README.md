@@ -1,3 +1,5 @@
+![Chat Report Generator](social_preview.png)
+
 # Chat Report Generator
 
 **Chat Report Generator** è un tool in Python progettato per convertire le esportazioni delle chat (**esclusivamente dai report Excel di Cellebrite Inseyets**) in report HTML puliti, leggibili e ricercabili.
