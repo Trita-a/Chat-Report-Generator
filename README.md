@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="social_preview.png" width="80%" alt="Chat Report Generator Cover" />
+  <img src="assets/social_preview.png" width="80%" alt="Chat Report Generator Cover" />
 </p>
 
 # Chat Report Generator
@@ -9,8 +9,8 @@
 Replica lo stile visivo delle app di messaggistica più diffuse (Signal e WhatsApp) per offrire un'esperienza di lettura familiare per analisi forensi o revisioni.
 
 <p align="center">
-  <img src="preview.png" width="45%" alt="Anteprima Report Chat - Signal" />
-  <img src="preview_whatsapp.png" width="45%" alt="Anteprima Report Chat - WhatsApp" />
+  <img src="assets/preview.png" width="45%" alt="Anteprima Report Chat - Signal" />
+  <img src="assets/preview_whatsapp.png" width="45%" alt="Anteprima Report Chat - WhatsApp" />
 </p>
 
 ## ✨ Funzionalità
@@ -19,7 +19,7 @@ Replica lo stile visivo delle app di messaggistica più diffuse (Signal e WhatsA
 *   **Doppio Stile**:
     *   **Signal**: Tema autentico blu/bianco con avatar rotondi.
     *   **WhatsApp**: Classico stile con bolle e sfondo predefinito.
-*   **Ricerca HTML**: Barra di ricerca integrata nel report HTML per filtrare le chat o cercare messaggi specifici istantaneamente.
+*   **Ricerca HTML (Premium)**: Barra di ricerca integrata nel report HTML per filtrare le chat o cercare messaggi specifici istantaneamente.
 *   **Ricerca Avanzata**: Trova messaggi, parole chiave e traduzioni, evidenziandoli e scorrendo direttamente al punto esatto della conversazione.
 *   **Supporto Media**: Gestisce immagini, video e allegati audio se presenti nell'esportazione.
 *   **Parsing Intelligente**: Rileva automaticamente i partecipanti "Proprietario" e "Contatto" dalle intestazioni Cellebrite.
@@ -39,7 +39,7 @@ Avvia semplicemente `ChatReportGenerator.exe`.
     ```
 2.  Avvia lo script:
     ```bash
-    python ChatReportGenerator.py
+    python src/ChatReportGenerator.py
     ```
 
 ## 🛠️ Compilazione
@@ -47,13 +47,13 @@ Avvia semplicemente `ChatReportGenerator.exe`.
 Per compilare l'eseguibile da solo:
 
 ```bash
-pyinstaller --noconsole --onefile --clean --name "ChatReportGenerator" ChatReportGenerator.py
+pyinstaller --noconsole --onefile --clean --name "ChatReportGenerator" src/ChatReportGenerator.py
 ```
 
 ## 📂 Struttura del Progetto
 
-*   `ChatReportGenerator.py`: Script principale consolidato (Interfaccia + Logica).
-*   `ChatReportGenerator_Pandas.py`: Versione di backup che usa Pandas.
+*   `src/ChatReportGenerator.py`: Script principale consolidato (Interfaccia + Logica).
+*   `legacy/ChatReportGenerator_Pandas.py`: Versione di backup che usa Pandas.
 *   `dist/`: Cartella di output per l'eseguibile.
 
 ## 📝 Licenza
