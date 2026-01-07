@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/coperthina.png" alt="Chat Report Generator Cover" />
+  <img src="assets/copertina.png" alt="Chat Report Generator Cover" />
 </p>
 
 # Chat Report Generator
