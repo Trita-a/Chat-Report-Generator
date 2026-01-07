@@ -1,4 +1,6 @@
-![Chat Report Generator](social_preview.png)
+<p align="center">
+  <img src="social_preview.png" width="80%" alt="Chat Report Generator Cover" />
+</p>
 
 # Chat Report Generator
 
