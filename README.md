@@ -51,4 +51,4 @@ pyinstaller --noconsole --onefile --clean --name "ChatReportGenerator" ChatRepor
 *   `dist/`: Cartella di output per l'eseguibile.
 
 ## 📝 Licenza
-[MIT](https://choosealicense.com/licenses/mit/)
+Copyright © 2026 William Tritapepe. Tutti i diritti riservati.
