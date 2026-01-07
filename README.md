@@ -4,7 +4,8 @@
 
 Replica lo stile visivo delle app di messaggistica più diffuse (Signal e WhatsApp) per offrire un'esperienza di lettura familiare per analisi forensi o revisioni.
 
-![Anteprima Report Chat](preview.png)
+![Anteprima Report Chat - Signal](preview.png)
+![Anteprima Report Chat - WhatsApp](preview_whatsapp.png)
 
 ## ✨ Funzionalità
 
