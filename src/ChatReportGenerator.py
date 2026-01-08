@@ -26,6 +26,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxyge
 .message.sent .sender-name { display: none; }
 .timestamp { font-size: 10px; opacity: 0.6; float: right; margin-left: 8px; margin-top: 4px; }
 .message.sent .timestamp { color: rgba(255,255,255,0.8); }
+.message.has-attachment { padding: 5px; }
+.message.has-attachment .attachment img { max-width: 200px; border-radius: 6px; margin: 0; }
 
 /* SIDEBAR STYLES */
 .signal-sidebar-header { font-size: 20px; font-weight: bold; padding: 24px 20px 16px 20px; border-bottom: 1px solid #e6e6e6; color: #1b1b1b; }
@@ -45,7 +47,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxyge
 .translation { margin-top: 8px; padding: 8px 10px; border-left: 3px solid #fecb00; font-style: normal; font-size: 13.5px; background-color: rgba(255,255,255,0.95); color: #333; border-radius: 6px; display: block; clear: both; margin-bottom: 2px; }
 .date-divider { align-self: center; color: #555; font-size: 13px; margin: 15px 0; font-weight: 500; text-align: center; }
 .message.sent .translation { background-color: rgba(255,255,255,0.15); color: white; border-left-color: rgba(255,255,255,0.5); }
-.attachment img { max-width: 250px; border-radius: 12px; margin-top: 5px; cursor: pointer; }
+.attachment img { max-width: 200px; border-radius: 12px; margin-top: 5px; cursor: pointer; }
 .attachment video { max-width: 250px; border-radius: 12px; margin-top: 5px; }
 .attachment audio { max-width: 250px; margin-top: 5px; }
 .search-box { padding: 10px 15px; background-color: #f7f7f7; border-bottom: 1px solid #e6e6e6; }
@@ -95,8 +97,14 @@ body { font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background
 .sidebar-name { font-weight: 600; font-size: 15px; color: #111b21; }
 .sidebar-info { font-size: 13px; color: #667781; }
 .translation { margin-top: 6px; padding: 6px 8px; border-left: 3px solid #ffcc00; font-size: 13px; background-color: rgba(0,0,0,0.03); color: #333; border-radius: 4px; font-style: italic; }
-.attachment video { max-width: 100%; border-radius: 8px; margin-top: 5px; }
+.date-divider { text-align: center; align-self: center; margin: 10px 0; padding: 5px 12px; background-color: rgba(255,255,255,0.9); border-radius: 7.5px; box-shadow: 0 1px 0.5px rgba(11,20,26,0.13); color: #555; font-size: 12.5px; }
+.attachment img { max-width: 200px; border-radius: 6px; margin-top: 4px; cursor: pointer; }
+.attachment video { max-width: 200px; border-radius: 8px; margin-top: 5px; }
 .attachment audio { max-width: 100%; margin-top: 5px; }
+.message.received .sender-name { font-weight: bold; font-size: 13.5px; color: #d64937; margin-bottom: 4px; display: block; }
+.message.sent .sender-name { font-weight: bold; font-size: 13.5px; color: #555; margin-bottom: 4px; display: block; opacity: 0.9; }
+.message.has-attachment { padding: 5px; }
+.message.has-attachment .attachment img { max-width: 200px; border-radius: 6px; margin: 0; }
 .search-box { padding: 10px; background-color: #f0f2f5; border-bottom: 1px solid #d1d7db; }
 .search-input { width: 100%; padding: 7px 12px; border-radius: 8px; border: none; background-color: #ffffff; font-size: 14px; box-sizing: border-box; height: 35px; outline: none; }
 
@@ -150,68 +158,86 @@ def parse_participants_intelligent(data, chat_id=""):
     Intelligent logic to extract Owner and Contact from chat data.
     Returns: (owner_name, owner_number, contact_name, contact_number)
     """
-    def extract_name_number(text_segment):
-        cleaned = re.sub(r'\(proprietario\)', '', text_segment, flags=re.IGNORECASE)
-        cleaned = re.sub(r'\(owner\)', '', cleaned, flags=re.IGNORECASE)
-        cleaned = cleaned.replace("_x000d_", "").strip()
-        
-        number_match = re.search(r'\+?\d{8,}', cleaned)
-        number = ""
-        name = cleaned
-        
-        if number_match:
-            number = number_match.group(0)
-            name = cleaned.replace(number, "").strip()
-        
-        name = name.strip(",.- ")
-        if not name: name = "Sconosciuto"
-        if not number: number = "(Numero non presente)"
-        
-        return name, number
+    # 1. Get Owner from metadata if available (populated by WhatsAppParser)
+    owner_name = data.get('owner', 'Unknown')
+    owner_num = "" 
+    if owner_name == "Unknown" or not owner_name:
+         owner_name = "Proprietario"
 
-    owner_account_raw = str(data.get('owner', ''))
-    owner_digits = re.sub(r'\D', '', owner_account_raw)
+    # Infer Owner from Messages if not known
+    if owner_name == "Proprietario" or owner_name == "Tu":
+        # Scan messages for is_sent = True
+        msgs = data.get('messages', [])
+        for m in msgs:
+            if m.get('is_sent', False):
+                possible_owner = m.get('sender')
+                if possible_owner and possible_owner != "Tu" and possible_owner != "Proprietario":
+                     owner_name = possible_owner
+                     break
     
-    parts_raw = str(data.get('participants', ''))
-    segments = re.split(r'_x000d_|\n', parts_raw)
-    
-    owner_name = "Proprietario"
-    owner_num = owner_account_raw
-    
-    contact_name = "Contatto"
+    # 2. Get Contact Name from participants field (already cleaned by Parser)
+    contact_name = data.get('participants', '')
     contact_num = ""
-    
-    found_contact = False
-    
-    # Fallback for space separated (WhatsApp)
-    if ' ' in parts_raw and '_x000d_' not in parts_raw and '\n' not in parts_raw:
-        segments = parts_raw.split(' ')
 
-    for seg in segments:
-        if not seg.strip(): continue
-        
-        s_name, s_number = extract_name_number(seg)
-        s_digits = re.sub(r'\D', '', s_number)
-        
-        # Check if owner
-        if owner_digits and len(owner_digits) > 5 and owner_digits in s_digits:
-            owner_name = s_name
-            owner_num = s_number
-        else:
-            if not found_contact:
-                contact_name = s_name
-                contact_num = s_number
-                found_contact = True
+    # If contact_name still contains "Sconosciuto" and we can't do better, keep it.
+    if not contact_name or contact_name == "Unknown":
+         contact_name = str(chat_id).replace("Chat ", "")
+
+    # Fallback/Legacy Logic for Cellebrite Parser
+    if "_x000d_" in contact_name or "\n" in contact_name:
+        parts_raw = contact_name
+        segments = re.split(r'_x000d_|\n', parts_raw)
+        c_names = []
+        for seg in segments:
+            seg = seg.strip()
+            if not seg: continue
+            seg = re.sub(r'\(proprietario\)', '', seg, flags=re.IGNORECASE)
+            seg = re.sub(r'\(owner\)', '', seg, flags=re.IGNORECASE).strip()
+            if seg and "sconosciuto" not in seg.lower():
+                 c_names.append(seg)
+        if c_names:
+             contact_name = " & ".join(c_names)
+
+    # Clean Owner from Contact Name if present
+    if owner_name and owner_name != "Proprietario" and owner_name != "Tu":
+        if owner_name in contact_name and " & " in contact_name:
+             # Basic replace: Remove "Alice & " or " & Alice"
+             contact_name = contact_name.replace(f"{owner_name} & ", "").replace(f" & {owner_name}", "")
+    
+    # Final cleanup: Separate Number from Name if mixed "12345 Name"
+    # This fixes "+39347... Name" appearing in sidebar
+    if contact_name:
+        # Regex for long number sequence
+        match = re.search(r'(\+?\d{7,})', contact_name)
+        if match:
+            extracted_num = match.group(1)
+            # Check if it's the whole string
+            if len(extracted_num) == len(contact_name.replace(" ", "")):
+                # It's just a number
+                contact_num = extracted_num
+                # keep contact_name as is or same? 
+                # If just number, name is number.
             else:
-                contact_name += f", {s_name}"
+                # It is "Number Name" or "Name Number"
+                contact_num = extracted_num
+                contact_name = contact_name.replace(extracted_num, "").strip(" -.,")
+                if not contact_name: 
+                    contact_name = contact_num # Fallback if name becomes empty
 
-    if "Sconosciuto" in owner_name or not owner_name:
-         owner_name = "Tu"
+    # Final cleanup: Separate Number from Name for Owner (fixing user request)
+    if owner_name and owner_num == "":
+        match = re.search(r'(\+?\d{7,})', owner_name)
+        if match:
+            extracted_num = match.group(1)
+            if len(extracted_num) == len(owner_name.replace(" ", "")):
+                owner_num = extracted_num
+            else:
+                owner_num = extracted_num
+                owner_name = owner_name.replace(extracted_num, "").strip(" -.,")
+                if not owner_name: owner_name = owner_num
 
-    if contact_name == "Contatto":
-         if "Chat" not in str(chat_id):
-             contact_name = str(chat_id)
-             
+    return owner_name, owner_num, contact_name, contact_num
+
     return owner_name, owner_num, contact_name, contact_num
 
 def process_attachments(source_dir, output_dir):
@@ -356,68 +382,281 @@ class CellebriteParser(BaseParser):
         return chats
 
 class WhatsAppParser(BaseParser):
-    def parse(self, filepath):
-        print("Using WhatsAppParser (Light)...")
+    def parse(self, filepath, attachment_lookup=None):
+        print(f"Using WhatsAppParser (Light)... Lookup size: {len(attachment_lookup) if attachment_lookup else 0}")
         wb = openpyxl.load_workbook(filepath, data_only=True)
-        sheet = wb['Instant Messages']
+        # Try multiple variations of the sheet name
+        sheet_name = 'Instant Messages'
+        if 'Messaggi istantanei' in wb.sheetnames:
+            sheet_name = 'Messaggi istantanei'
+        elif 'Instant Messages' in wb.sheetnames:
+            sheet_name = 'Instant Messages'
+        else:
+            # Fallback: try to find any sheet with "Instant" or "Messaggi"
+            found = False
+            for name in wb.sheetnames:
+                if "instant" in name.lower() or "messaggi" in name.lower():
+                    sheet_name = name
+                    found = True
+                    break
+            
+            if not found:
+                 raise KeyError("Sheet 'Messaggi istantanei' or 'Instant Messages' not found.")
+
+        print(f"Reading sheet: {sheet_name}")
+        sheet = wb[sheet_name]
         
         # Find headers
         rows = list(sheet.iter_rows(values_only=True))
+        if not rows: 
+            print("DEBUG: No rows found in sheet.")
+            return {}
+        
         if not rows: return {}
         
-        header = rows[0]
-        # Map columns
+        # Search for header in first 10 rows
+        header = None
+        start_row_index = 0
+        
+        # Potential header keywords to look for
+        keywords = ["Da", "A", "From", "To", "Corpo", "Body"]
+        
+        for i, row in enumerate(rows[:10]):
+            row_vals = [str(c).lower() for c in row if c is not None]
+            # Check if at least 2 keywords are in this row
+            matches = sum(1 for k in keywords if k.lower() in row_vals)
+            if matches >= 2:
+                header = row
+                start_row_index = i + 1
+                print(f"Header found at row {i}: {header}")
+                break
+        
+        if not header:
+            # Fallback to row 0 if no header found (unlikely but safe)
+            header = rows[0]
+            start_row_index = 1
+            print("Warning: Header not auto-detected, using first row.")
+
+        # Map columns (handle both English and Italian)
         col_map = {name: i for i, name in enumerate(header) if name}
         
         chats = {}
         
-        for row in rows[1:]:
+        for row in rows[start_row_index:]:
             try:
-                def get_col(name):
-                    return row[col_map[name]] if name in col_map and col_map[name] < len(row) else None
+                def get_col(names):
+                    if isinstance(names, str): names = [names]
+                    for n in names:
+                        if n in col_map and col_map[n] < len(row):
+                            return row[col_map[n]]
+                    return None
 
-                from_val = get_col('From')
-                to_val = get_col('To')
-                body_val = get_col('Body')
-                
-                # Timestamp might be split or named differently
-                time_val = get_col('Timestamp-Time')
-                if time_val is None: time_val = get_col('Timestamp')
+                from_val = get_col(['From', 'Da'])
+                to_val = get_col(['To', 'A'])
                 
                 if from_val is None and to_val is None: continue
 
+                body_val = get_col(['Body', 'Corpo'])
+                
+                # Timestamp might be split or named differently
+                time_val = get_col(['Timestamp-Time', 'Timestamp-Ora', 'Timestamp'])
+                
+                # Tag/Label for translation
+                tag_val = get_col(['Tag', 'Etichetta', 'Note investigative', 'Messaggio Note investigative'])
+
+                if from_val is None and to_val is None: continue
+
+                direction_val = get_col(['Direction', 'Orientamento', 'Type', 'Tipo'])
+                
+                # Source info for attachments fallback
+                source_info_val = get_col(['Informazioni sul file di origine', 'Source File Information'])
+
                 # Participants logic
-                parts = set(re.findall(r'(\d+@s\.whatsapp\.net)', str(from_val) + " " + str(to_val)))
-                if not parts: continue
+                sender_raw = str(from_val)
+                receiver_raw = str(to_val)
                 
-                chat_id = "Chat " + "-".join(sorted([p.split('@')[0] for p in parts]))
+                def clean_participant(p):
+                    # Remove " - Inviato:..." or " - Sent:..." metadata
+                    p = re.split(r'\s-\s(?:Inviato|Sent|Letti|Read|Delivered):', p, flags=re.IGNORECASE)[0]
+                    # Remove (proprietario)/(owner)
+                    p = re.sub(r'\((?:proprietario|owner|device owner)\)', '', p, flags=re.IGNORECASE)
+                    # Remove _x000d_ and unicode garbage
+                    p = p.replace('_x000d_', ' ').replace('\u200e', '').replace('\u202c', '')
+                    # Replace newlines with space
+                    p = p.replace('\n', ' ').replace('\r', ' ')
+                    # Normalize whitespace
+                    p = re.sub(r'\s+', ' ', p).strip()
+                    # Remove trailing punctuation
+                    p = p.strip('.,&;- ')
+                    return p
+
+                p1_clean = clean_participant(sender_raw)
+                p2_clean = clean_participant(receiver_raw)
                 
+                # Filter out "Sconosciuto" if possible
+                def is_valid_name(n):
+                    if not n: return False
+                    n_low = n.lower()
+                    if "sconosciuto" in n_low or "unknown" in n_low: return False
+                    if n_low == "&": return False
+                    return True
+
+                # Determine who is the "Owner" (Me)
+                is_p1_owner = "(proprietario)" in sender_raw.lower() or "(owner)" in sender_raw.lower()
+                is_p2_owner = "(proprietario)" in receiver_raw.lower() or "(owner)" in receiver_raw.lower()
+                
+                # Chat ID Generation
+                parts = set(re.findall(r'(\d+@s\.whatsapp\.net)', sender_raw + " " + receiver_raw))
+                if parts:
+                    chat_id = "Chat " + "-".join(sorted([p.split('@')[0] for p in parts]))
+                else:
+                    # Use cleaned names for ID
+                    parts_list = sorted([p for p in [p1_clean, p2_clean] if is_valid_name(p)])
+                    if not parts_list:
+                        # Fallback to whatever we have if both are sconosciuto
+                        parts_list = sorted([p for p in [p1_clean, p2_clean] if p])
+                        if not parts_list: parts_list = ["Unknown"]
+                    
+                    chat_id = f"Chat {' & '.join(parts_list)}"
+                    chat_id = re.sub(r'[^\w\s\-\.]', '', chat_id)[:100]
+
+                # Determine nice title for THIS row
+                row_title = ""
+                valid_names = [p for p in [p1_clean, p2_clean] if is_valid_name(p)]
+                
+                if is_p1_owner and p2_clean:
+                    row_title = p2_clean
+                elif is_p2_owner and p1_clean:
+                    row_title = p1_clean
+                elif len(valid_names) == 1:
+                    row_title = valid_names[0]
+                elif len(valid_names) >= 2:
+                    row_title = " & ".join(valid_names)
+                else:
+                    # Both invalid/sconosciuto
+                    row_title = "Chat Sconosciuta"
+
                 if chat_id not in chats:
                     chats[chat_id] = {
                         "id": chat_id,
-                        "participants": " ".join(parts),
+                        "participants": row_title, 
                         "owner": "Unknown",
                         "messages": []
                     }
+                else:
+                    # Update title if current one is bad and new one is better
+                    curr_title = chats[chat_id]["participants"]
+                    if ("sconosciuta" in curr_title.lower() or "unknown" in curr_title.lower()) and \
+                       ("sconosciuta" not in row_title.lower() and "unknown" not in row_title.lower()):
+                            chats[chat_id]["participants"] = row_title
                 
-                sender_match = re.search(r'(\d+@s\.whatsapp\.net)', str(from_val))
-                sender = sender_match.group(1).split('@')[0] if sender_match else "Unknown"
+                # Update Owner if found
+                current_owner = chats[chat_id]["owner"]
+                if current_owner == "Unknown":
+                    if is_p1_owner:
+                        chats[chat_id]["owner"] = p1_clean
+                    elif is_p2_owner:
+                        chats[chat_id]["owner"] = p2_clean
+
+                # Sender Logic
+                sender = p1_clean
+                if "@s.whatsapp.net" in sender_raw:
+                    m = re.search(r'(\d+@s\.whatsapp\.net)', sender_raw)
+                    if m: sender = m.group(1).split('@')[0]
                 
+                # Direction Logic
                 is_sent = False 
+                
+                # 1. Try explicit 'Direction' column
+                if direction_val:
+                    d_str = str(direction_val).lower()
+                    if "uscita" in d_str or "outgoing" in d_str:
+                        is_sent = True
+                    elif "entrata" in d_str or "incoming" in d_str:
+                        is_sent = False
+                    # Else fall through
+                
+                # 2. Fallback to owner tag logic if direction ambiguous or not found
+                if not is_sent: # Only check if not already confirmed sent
+                     if is_p1_owner and p1_clean == sender: 
+                        is_sent = True
+
                 
                 body = clean_text(body_val)
                 ts_str = str(time_val) if time_val is not None else ""
                 
+                # Attachment Processing
+                att_info = None
+                source_info = str(source_info_val) if source_info_val else ""
+                
+                # Check for "part...mms" in source info (Signal/WhatsApp native dumps)
+                if "part" in source_info and ".mms" in source_info:
+                     # Attempt to extract part filename
+                     try:
+                         # Ex: .../app_parts/part123.mms/part123.mms.
+                         # Logic: look for part<digits>.mms or similar
+                         m = re.search(r'(part\d+\.mms)', source_info)
+                         if m:
+                             att_info = m.group(1) + "_" # Often has trailing underscore on disk
+                         else:
+                             att_info = "Attachment (unknown)"
+                     except: pass
+                
+                # CROSS-REFERENCE LOOKUP
+                if attachment_lookup and ts_str:
+                     # Clean timestamp to match key
+                     # Expect key to be: "20/05/2025 21:45:46" (roughly)
+                     # Valid keys in map are strings.
+                     # Remove (UTC...)
+                     ts_clean = re.sub(r'\(UTC.*?\)', '', ts_str).strip()
+                     
+                     if ts_clean in attachment_lookup:
+                         real_att = attachment_lookup[ts_clean]
+                         if real_att:
+                             att_info = real_att # OVERRIDE with real name
+                
+                # Translation extraction from Tag
+                trans_raw = str(tag_val) if tag_val is not None else ""
+                translation = ""
+                
+                # Filter out known non-translation tags
+                ignore_tags = ["deleted", "read", "delivered", "sent", "cancellato", "letto", "consegnato", "inviato", "none", "nan"]
+                
+                if "Traduzione:" in trans_raw:
+                    try:
+                        translation = trans_raw.split("Traduzione:", 1)[1]
+                        # Often followed by "Etichette:" or other fields
+                        if "Etichette:" in translation:
+                            translation = translation.split("Etichette:", 1)[0]
+                        translation = clean_text(translation)
+                    except: pass
+                elif "Descrizione:" in trans_raw:
+                    try:
+                        translation = trans_raw.split("Descrizione:", 1)[1]
+                        # Often followed by "Etichette:", "Creato:", "Modificato:"
+                        if "Etichette:" in translation:
+                            translation = translation.split("Etichette:", 1)[0]
+                        if "Creato:" in translation:
+                            translation = translation.split("Creato:", 1)[0]
+                        translation = clean_text(translation)
+                    except: pass
+                elif trans_raw.strip() and trans_raw.lower() not in ignore_tags:
+                    # Fallback: Assume the whole tag is a translation if it's not a status tag
+                    # But exclude simple numbers or short codes
+                    if len(trans_raw) > 2 and not trans_raw.isdigit():
+                         translation = clean_text(trans_raw)
+
                 chats[chat_id]["messages"].append({
                     "sender": sender,
                     "is_sent": is_sent,
                     "body": body,
                     "time": ts_str,
-                    "att": None,
-                    "trans": None
+                    "att": att_info,
+                    "trans": translation
                 })
                 
             except Exception as e:
+                # print(f"Row error: {e}")
                 pass
         
         return chats
@@ -444,11 +683,36 @@ class HTMLRenderer:
             data = chats[chat_id]
             msgs = data["messages"]
 
+            # SORT MESSAGES CHRONOLOGICALLY
+            def parse_ts(m):
+                ts_str = m.get("time", "")
+                if not ts_str: return datetime.min
+                # Remove (UTC...)
+                clean = re.sub(r'\(UTC.*?\)', '', ts_str).strip()
+                try:
+                    # Try common formats
+                    # 20/05/2025 19:00:03
+                    return datetime.strptime(clean, "%d/%m/%Y %H:%M:%S")
+                except:
+                    try:
+                        return datetime.strptime(clean, "%d/%m/%Y %H:%M")
+                    except:
+                        try:
+                            # Try just date? or different sep
+                            return datetime.strptime(clean, "%Y-%m-%d %H:%M:%S")
+                        except:
+                            return datetime.min # Fail safe
+
+            msgs.sort(key=parse_ts)
+
             # Parse Participants for Layout
             owner_name, owner_num, contact_name, contact_num = parse_participants_intelligent(data, chat_id)
             
             # Sidebar Item
             avatar_letter = contact_name[0].upper() if contact_name else "?"
+            
+            # Dynamic Owner Avatar
+            owner_initial = owner_name[0].upper() if owner_name and owner_name != "Unknown" else "P"
             
             # Search Index Generation
             search_text = f"{contact_name} {contact_num} " + " ".join([f"{m['body']} {m['trans'] or ''}" for m in msgs])
@@ -487,9 +751,10 @@ class HTMLRenderer:
                 
                 sender_disp = msg["sender"]
                 if msg["is_sent"]: 
-                    sender_disp = "Tu"
-                elif sender_disp in contact_num:
-                    sender_disp = contact_name
+                    sender_disp = owner_name if owner_name and owner_name != "Unknown" else "Tu"
+                else:
+                    # Received: prefer contact name over number
+                    sender_disp = contact_name if contact_name else sender_disp
 
                 sender_div = f'<div class="sender-name">{sender_disp}</div>'
                 
@@ -537,8 +802,9 @@ class HTMLRenderer:
                 if msg["trans"]:
                     trans_html = f'<div class="translation">{msg["trans"]}</div>'
                 
+                has_att_class = " has-attachment" if msg["att"] else ""
                 msgs_html += f"""
-                <div id="{msg_id}" class="message {msg_class}">
+                <div id="{msg_id}" class="message {msg_class}{has_att_class}">
                     {sender_div}
                     <div class="msg-content">
                         {msg['body']}
@@ -550,13 +816,16 @@ class HTMLRenderer:
                 """
                 
             # Header
+            owner_num_disp = owner_num if owner_num else "(Numero non presente)"
+            contact_num_disp = contact_num if contact_num else "(Numero non presente)"
+
             header_html = f"""
             <div class="chat-info-header">
                 <div class="participant-card">
-                    <div class="participant-avatar owner">T</div>
+                    <div class="participant-avatar owner">{owner_initial}</div>
                     <div class="participant-details">
                         <span class="participant-name">{owner_name}</span>
-                        <span class="participant-number">{owner_num}</span>
+                        <span class="participant-number">{owner_num_disp}</span>
                     </div>
                 </div>
                 
@@ -566,7 +835,7 @@ class HTMLRenderer:
                     <div class="participant-avatar">{avatar_letter}</div>
                     <div class="participant-details">
                         <span class="participant-name">{contact_name}</span>
-                        <span class="participant-number">{contact_num}</span>
+                        <span class="participant-number">{contact_num_disp}</span>
                     </div>
                 </div>
             </div>
@@ -753,7 +1022,65 @@ class HTMLRenderer:
 # MAIN LOGIC
 # ==========================================
 
-def run_generation(input_file, style="signal", output_dir=None, format_type="auto"):
+def build_chat_attachment_map(filepath):
+    """
+    Reads 'Chat' sheet to build a map of Timestamp -> Attachment Filename.
+    Used to resolve attachments in 'Instant Messages'.
+    """
+    try:
+        wb = openpyxl.load_workbook(filepath, data_only=True)
+        if 'Chat' not in wb.sheetnames: return {}
+        sheet = wb['Chat']
+        rows = list(sheet.iter_rows(values_only=True))
+        
+        # Simple/Safe header detection
+        header = None
+        start_row = 0
+        for i, row in enumerate(rows[:5]):
+            r_str = [str(x).lower() for x in row if x]
+            # Key checks: 'timestamp: ora' (split), 'corpo', 'allegato'
+            matches = 0
+            if any("timestamp" in x for x in r_str): matches += 1
+            if any("corpo" in x for x in r_str) or any("body" in x for x in r_str): matches += 1
+            if matches >= 2:
+                header = row
+                start_row = i + 1
+                break
+        
+        if not header: return {}
+        
+        col_map = {str(n).lower(): idx for idx, n in enumerate(header) if n}
+        
+        # Identify indices
+        c_time_idx = -1
+        # 'Timestamp: Ora' usually contains the full date/time string "20/05/2025 21:45:46(UTC+1)"
+        for k, v in col_map.items():
+            if "timestamp" in k and "ora" in k: c_time_idx = v; break
+        
+        c_att_idx = -1
+        for k, v in col_map.items():
+            if "allegato" in k and "#1" in k and "dettagli" not in k: c_att_idx = v; break
+        
+        if c_time_idx == -1 or c_att_idx == -1: return {}
+        
+        lookup = {}
+        for row in rows[start_row:]:
+            if len(row) <= max(c_time_idx, c_att_idx): continue
+            
+            ts_val = str(row[c_time_idx]) if row[c_time_idx] else ""
+            att_val = str(row[c_att_idx]) if row[c_att_idx] else ""
+            
+            if ts_val and att_val:
+                # Clean timestamp: remove newlines, (UTC...), whitespace
+                ts_clean = re.sub(r'\(UTC.*?\)', '', ts_val).strip()
+                lookup[ts_clean] = att_val
+                
+        return lookup
+    except Exception as e:
+        print(f"Error building attachment map: {e}")
+        return {}
+
+def run_generation(input_file, style="signal", source_type="chats", output_dir=None, format_type="auto"):
     input_path = os.path.abspath(input_file)
     base_dir = os.path.dirname(input_path)
     
@@ -767,35 +1094,25 @@ def run_generation(input_file, style="signal", output_dir=None, format_type="aut
     print(f"Input: {input_path}")
     print(f"Output: {out_dir}")
     print(f"Style: {style}")
+    print(f"Source Mode: {source_type}")
 
-    # 1. Determine Parser
+    # 1. Determine Parser based on Source Type
     parser_impl = None
-    if format_type == "cellebrite":
-        parser_impl = CellebriteParser()
-    elif format_type == "whatsapp":
-        parser_impl = WhatsAppParser()
+    att_lookup = None
+    
+    if source_type == "instant":
+        print("Using Instant Messages Parser...")
+        # Build attachment lookup from 'Chat' tab
+        print("Building Attachment Lookup from 'Chat' tab...")
+        att_lookup = build_chat_attachment_map(input_path)
+        print(f"Attachment Lookup Built: {len(att_lookup)} entries.")
+        
+        parser_impl = WhatsAppParser() # Uses 'Instant Messages' tab logic
+        chats = parser_impl.parse(input_path, attachment_lookup=att_lookup)
     else:
-        # Auto detect
-        try:
-            wb = openpyxl.load_workbook(input_path, read_only=True)
-            sheet_names = wb.sheetnames
-            wb.close()
-            
-            if "Chat" in sheet_names:
-                print("Detected Cellebrite format (Chat sheet found)")
-                parser_impl = CellebriteParser()
-            elif "Instant Messages" in sheet_names:
-                print("Detected WhatsApp format (Instant Messages sheet found)")
-                parser_impl = WhatsAppParser()
-            else:
-                print("Could not detect format. Defaulting to Cellebrite.")
-                parser_impl = CellebriteParser()
-        except Exception as e:
-            print(f"Error reading excel: {e}")
-            return
-
-    # 2. Parse
-    chats = parser_impl.parse(input_path)
+        print("Using Standard Chat Parser...")
+        parser_impl = CellebriteParser() # Uses 'Chat' tab logic
+        chats = parser_impl.parse(input_path)
     print(f"Parsed {len(chats)} chats.")
     
     # 3. Scan attachments
@@ -855,6 +1172,12 @@ class App:
         tk.Radiobutton(frame_opts, text="Signal (Blue)", variable=self.var_style, value="signal", bg="#f0f0f0").grid(row=0, column=1)
         tk.Radiobutton(frame_opts, text="WhatsApp (Green)", variable=self.var_style, value="whatsapp", bg="#f0f0f0").grid(row=0, column=2)
         
+        # Source
+        tk.Label(frame_opts, text="Sorgente:", bg="#f0f0f0", font=font_label).grid(row=1, column=0, padx=5, sticky="w", pady=5)
+        self.var_source = tk.StringVar(value="chats")
+        tk.Radiobutton(frame_opts, text="Chat (Standard)", variable=self.var_source, value="chats", bg="#f0f0f0").grid(row=1, column=1, sticky="w")
+        tk.Radiobutton(frame_opts, text="Messaggi Istantanei", variable=self.var_source, value="instant", bg="#f0f0f0").grid(row=1, column=2, sticky="w")
+        
         # 3. Action
         frame_action = tk.Frame(root, bg="#f0f0f0", pady=20)
         frame_action.pack(fill=tk.X, padx=20)
@@ -891,18 +1214,19 @@ class App:
             return
             
         style = self.var_style.get()
+        source = self.var_source.get()
         
         # Disable button
         self.btn_open.config(state=tk.DISABLED)
         
-        t = threading.Thread(target=self.run_process, args=(input_path, style))
+        t = threading.Thread(target=self.run_process, args=(input_path, style, source))
         t.start()
         
-    def run_process(self, input_path, style):
+    def run_process(self, input_path, style, source):
         print("--- Inizio Elaborazione ---")
         try:
             # Determine output automatically (same dir)
-            out_dir = run_generation(input_path, style=style, output_dir=None, format_type="auto")
+            out_dir = run_generation(input_path, style=style, source_type=source, output_dir=None)
             self.last_output_dir = out_dir
             
             self.root.after(0, lambda: self.finish_success())
