@@ -50,6 +50,25 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxyge
 .attachment img { max-width: 200px; border-radius: 12px; margin-top: 5px; cursor: pointer; }
 .attachment video { max-width: 250px; border-radius: 12px; margin-top: 5px; }
 .attachment audio { max-width: 250px; margin-top: 5px; }
+
+/* Signal Audio Message Visual */
+.audio-message { display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: linear-gradient(135deg, #e8eaed 0%, #f5f5f5 100%); border-radius: 20px; width: 100%; box-sizing: border-box; }
+.message.sent .audio-message { background: linear-gradient(135deg, #1a56db 0%, #2c6bed 100%); }
+.audio-play-btn { width: 40px; height: 40px; border-radius: 50%; background: #2c6bed; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
+.message.sent .audio-play-btn { background: rgba(255,255,255,0.25); }
+.audio-play-btn::after { content: ""; width: 0; height: 0; border-left: 12px solid white; border-top: 7px solid transparent; border-bottom: 7px solid transparent; margin-left: 3px; }
+.audio-play-btn.playing::after { border: none; width: 4px; height: 14px; background: white; box-shadow: 6px 0 0 white; margin-left: -5px; }
+.audio-waveform-container { flex: 1; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.audio-waveform { display: flex; align-items: center; gap: 1px; height: 24px; }
+.audio-waveform span { width: 2px; background: #b0c4de; border-radius: 1px; }
+.audio-waveform span.played { background: #2c6bed; }
+.message.sent .audio-waveform span { background: rgba(255,255,255,0.4); }
+.message.sent .audio-waveform span.played { background: rgba(255,255,255,0.9); }
+.audio-waveform span:nth-child(odd) { height: 60%; } .audio-waveform span:nth-child(even) { height: 100%; } .audio-waveform span:nth-child(3n) { height: 80%; } .audio-waveform span:nth-child(4n) { height: 45%; }
+.audio-duration { font-size: 11px; color: #666; font-weight: 500; }
+.message.sent .audio-duration { color: rgba(255,255,255,0.8); }
+.audio-label { font-size: 12px; color: #666; margin-top: 6px; font-style: italic; }
+.message.sent .audio-label { color: rgba(255,255,255,0.7); }
 .search-box { padding: 10px 15px; background-color: #f7f7f7; border-bottom: 1px solid #e6e6e6; }
 .search-input { width: 100%; padding: 8px 12px; border-radius: 6px; border: 1px solid #ddd; background-color: #e9e9e9; font-size: 14px; box-sizing: border-box; outline: none; }
 .search-input:focus { background-color: white; border-color: #2c6bed; }
@@ -105,6 +124,22 @@ body { font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background
 .message.sent .sender-name { font-weight: bold; font-size: 13.5px; color: #555; margin-bottom: 4px; display: block; opacity: 0.9; }
 .message.has-attachment { padding: 5px; }
 .message.has-attachment .attachment img { max-width: 200px; border-radius: 6px; margin: 0; }
+
+/* Audio Transcription Visual - WhatsApp Style */
+.audio-message { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: linear-gradient(135deg, #dcf8c6 0%, #d9fdd3 100%); border-radius: 20px; width: 100%; box-sizing: border-box; }
+.message.received .audio-message { background: linear-gradient(135deg, #f0f0f0 0%, #ffffff 100%); }
+.audio-play-btn { width: 36px; height: 36px; border-radius: 50%; background: #00a884; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.15); }
+.message.received .audio-play-btn { background: #00a884; }
+.audio-play-btn::after { content: ""; width: 0; height: 0; border-left: 10px solid white; border-top: 6px solid transparent; border-bottom: 6px solid transparent; margin-left: 2px; }
+.audio-play-btn.playing::after { border: none; width: 3px; height: 12px; background: white; box-shadow: 5px 0 0 white; margin-left: -4px; }
+.audio-waveform-container { flex: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.audio-waveform { display: flex; align-items: center; gap: 1px; height: 22px; }
+.audio-waveform span { width: 2px; background: #00a884; border-radius: 1px; opacity: 0.35; }
+.audio-waveform span.played { opacity: 1.0; }
+.audio-waveform span:nth-child(odd) { height: 60%; } .audio-waveform span:nth-child(even) { height: 100%; } .audio-waveform span:nth-child(3n) { height: 80%; } .audio-waveform span:nth-child(4n) { height: 45%; }
+.audio-duration { font-size: 11px; color: #667781; font-weight: 500; }
+.audio-label { font-size: 11px; color: #667781; margin-top: 4px; font-style: italic; }
+
 .search-box { padding: 10px; background-color: #f0f2f5; border-bottom: 1px solid #d1d7db; }
 .search-input { width: 100%; padding: 7px 12px; border-radius: 8px; border: none; background-color: #ffffff; font-size: 14px; box-sizing: border-box; height: 35px; outline: none; }
 
@@ -144,6 +179,9 @@ def clean_text(text):
         r'Modificato:.*?(?=\n|$)',
         r'Descrizione:.*?(?=\n|$)',
         r'Generator:.*?(?=\n|$)',
+        r'Tags:.*?(?=\n|$)',
+        r'Created:.*?(?=\n|$)',
+        r'Modified:.*?(?=\n|$)',
     ]
     cleaned = text
     for p in patterns:
@@ -469,26 +507,58 @@ class WhatsAppParser(BaseParser):
                 direction_val = get_col(['Direction', 'Orientamento', 'Type', 'Tipo'])
                 
                 # Source info for attachments fallback
-                source_info_val = get_col(['Informazioni sul file di origine', 'Source File Information'])
+                source_info_val = get_col(['Informazioni sul file di origine', 'Source File Information', 'Source file information'])
 
                 # Participants logic
                 sender_raw = str(from_val)
                 receiver_raw = str(to_val)
                 
                 def clean_participant(p):
-                    # Remove " - Inviato:..." or " - Sent:..." metadata
-                    p = re.split(r'\s-\s(?:Inviato|Sent|Letti|Read|Delivered):', p, flags=re.IGNORECASE)[0]
-                    # Remove (proprietario)/(owner)
-                    p = re.sub(r'\((?:proprietario|owner|device owner)\)', '', p, flags=re.IGNORECASE)
-                    # Remove _x000d_ and unicode garbage
-                    p = p.replace('_x000d_', ' ').replace('\u200e', '').replace('\u202c', '')
-                    # Replace newlines with space
-                    p = p.replace('\n', ' ').replace('\r', ' ')
-                    # Normalize whitespace
-                    p = re.sub(r'\s+', ' ', p).strip()
-                    # Remove trailing punctuation
-                    p = p.strip('.,&;- ')
-                    return p
+                    # 1. Handle "number@s.whatsapp.net Name" or any variant
+                    # Extract number and name
+                    
+                    cleaned_num = ""
+                    cleaned_name = p
+                    
+                    # Regex for ID pattern: digits followed by @s.whatsapp.net
+                    # We also want to catch just @s.whatsapp.net if no number
+                    m_id_num = re.search(r'(\d+)@s\.whatsapp\.net', p)
+                    if m_id_num:
+                        cleaned_num = m_id_num.group(1)
+                    
+                    # Remove ANY @s.whatsapp.net and preceding potential ID junk
+                    # This cleans "393...@s.whatsapp.net" -> ""
+                    cleaned_name = re.sub(r'\S*@s\.whatsapp\.net', ' ', cleaned_name)
+                    
+                    # 2. Remove " - Delivered:..." metadata (and others)
+                    split_pat = r'(?:\s+-\s+|-)(?:Inviato|Sent|Letti|Read|Delivered|Consegnato):'
+                    parts = re.split(split_pat, cleaned_name, flags=re.IGNORECASE)
+                    cleaned_name = parts[0]
+                    
+                    # 3. Remove (proprietario)/(owner)
+                    cleaned_name = re.sub(r'\((?:proprietario|owner|device owner)\)', '', cleaned_name, flags=re.IGNORECASE)
+                    
+                    # 4. Cleanup garbage
+                    cleaned_name = cleaned_name.replace('_x000d_', ' ').replace('\u200e', '').replace('\u202c', '')
+                    cleaned_name = cleaned_name.replace('\n', ' ').replace('\r', ' ')
+                    cleaned_name = re.sub(r'\s+', ' ', cleaned_name).strip()
+                    cleaned_name = cleaned_name.strip('.,&;- ')
+                    
+                    # 5. Re-assemble: "Name Number"
+                    if cleaned_num:
+                        # If name has become empty or just characters like "-", use number
+                        if not cleaned_name or len(cleaned_name) < 2:
+                            return cleaned_num
+                        
+                        # If the name ALREADY contains the number, don't duplicate
+                        if cleaned_num in cleaned_name.replace(" ", ""):
+                            return cleaned_name
+                            
+                        # If name ends with number, keep custom logic?
+                        # User wants Name + Number
+                        return f"{cleaned_name} {cleaned_num}"
+                    
+                    return cleaned_name
 
                 p1_clean = clean_participant(sender_raw)
                 p2_clean = clean_participant(receiver_raw)
@@ -520,6 +590,35 @@ class WhatsAppParser(BaseParser):
                     chat_id = f"Chat {' & '.join(parts_list)}"
                     chat_id = re.sub(r'[^\w\s\-\.]', '', chat_id)[:100]
 
+                # Sender Logic
+                sender = p1_clean
+                
+                # Direction Logic MOVED UP to help identify Owner
+                is_sent = False 
+                # 1. Try explicit 'Direction' column
+                if direction_val:
+                    d_str = str(direction_val).lower()
+                    if "uscita" in d_str or "outgoing" in d_str:
+                        is_sent = True
+                    elif "entrata" in d_str or "incoming" in d_str:
+                        is_sent = False
+                    # Else fall through
+                
+                # 2. Fallback to owner tag logic if direction ambiguous or not found
+                if not is_sent: # Only check if not already confirmed sent
+                     if is_p1_owner and p1_clean == sender: 
+                        is_sent = True
+
+                # IMPROVED OWNER INFERENCE
+                # If we know direction, we know who is owner (roughly)
+                # Outgoing -> Sender is Owner
+                # Incoming -> Receiver is Owner (assuming dump is from Owner's device)
+                if not is_p1_owner and not is_p2_owner:
+                    if is_sent:
+                        is_p1_owner = True # Sender is Owner
+                    else:
+                        is_p2_owner = True # Receiver is Owner
+
                 # Determine nice title for THIS row
                 row_title = ""
                 valid_names = [p for p in [p1_clean, p2_clean] if is_valid_name(p)]
@@ -546,43 +645,77 @@ class WhatsAppParser(BaseParser):
                 else:
                     # Update title if current one is bad and new one is better
                     curr_title = chats[chat_id]["participants"]
+                    
+                    # Logic: If current title is "Name & Name" (Ambiguous) but now we have a definitive single partner, overwrite it!
+                    is_ambiguous = " & " in curr_title
+                    is_better = " & " not in row_title and row_title != "Chat Sconosciuta"
+                    
                     if ("sconosciuta" in curr_title.lower() or "unknown" in curr_title.lower()) and \
                        ("sconosciuta" not in row_title.lower() and "unknown" not in row_title.lower()):
+                            chats[chat_id]["participants"] = row_title
+                    elif is_ambiguous and is_better:
                             chats[chat_id]["participants"] = row_title
                 
                 # Update Owner if found
                 current_owner = chats[chat_id]["owner"]
-                if current_owner == "Unknown":
+                if current_owner == "Unknown" or current_owner == "Proprietario":
                     if is_p1_owner:
                         chats[chat_id]["owner"] = p1_clean
                     elif is_p2_owner:
                         chats[chat_id]["owner"] = p2_clean
 
-                # Sender Logic
-                sender = p1_clean
-                if "@s.whatsapp.net" in sender_raw:
-                    m = re.search(r'(\d+@s\.whatsapp\.net)', sender_raw)
-                    if m: sender = m.group(1).split('@')[0]
-                
-                # Direction Logic
-                is_sent = False 
-                
-                # 1. Try explicit 'Direction' column
-                if direction_val:
-                    d_str = str(direction_val).lower()
-                    if "uscita" in d_str or "outgoing" in d_str:
-                        is_sent = True
-                    elif "entrata" in d_str or "incoming" in d_str:
-                        is_sent = False
-                    # Else fall through
-                
-                # 2. Fallback to owner tag logic if direction ambiguous or not found
-                if not is_sent: # Only check if not already confirmed sent
-                     if is_p1_owner and p1_clean == sender: 
-                        is_sent = True
-
                 
                 body = clean_text(body_val)
+
+                # Call Log Formatting
+                # Example: "Vlora (...) started a call. status: Missed type: audio call duration: 00:00:00 ..."
+                if "started a call" in body and "status:" in body:
+                    try:
+                        # Extract details
+                        call_type = "Chiamata"
+                        if "video call" in body: call_type = "Videochiamata"
+                        elif "audio call" in body: call_type = "Chiamata Audio"
+                        
+                        # Extract Duration first to help decide status
+                        duration = ""
+                        has_duration = False
+                        
+                        m_dur = re.search(r'duration:\s*(\d{2}:\d{2}:\d{2})', body)
+                        if m_dur:
+                            dur_str = m_dur.group(1)
+                            if dur_str != "00:00:00":
+                                duration = f" ({dur_str})"
+                                has_duration = True
+                        
+                        # Status Logic
+                        status = "Sconosciuto"
+                        
+                        # parse status strictly
+                        st_raw = "unknown"
+                        m_st = re.search(r'status:\s*(\w+)', body, flags=re.IGNORECASE)
+                        if m_st: st_raw = m_st.group(1).lower()
+                        
+                        if "missed" in st_raw:
+                            status = "Persa"
+                        elif "answered" in st_raw:
+                            if is_sent:
+                                status = "Effettuata"
+                            else:
+                                status = "Ricevuta"
+                        elif "incoming" in st_raw:
+                            if has_duration:
+                                status = "Ricevuta"
+                            else:
+                                status = "In Arrivo (Senza Risposta)" # Or just In Arrivo?
+                        elif "outgoing" in st_raw:
+                            if has_duration:
+                                status = "Effettuata"
+                            else:
+                                status = "In Uscita (Senza Risposta)"
+                        
+                        # Reformat body
+                        body = f"📞 {call_type} {status}{duration}"
+                    except: pass # Keep original parsing fails
                 ts_str = str(time_val) if time_val is not None else ""
                 
                 # Attachment Processing
@@ -601,6 +734,18 @@ class WhatsAppParser(BaseParser):
                          else:
                              att_info = "Attachment (unknown)"
                      except: pass
+                
+                # Check for .opus audio files (WhatsApp voice messages)
+                # Check for .opus audio files (WhatsApp voice messages)
+                if ".opus" in source_info.lower():
+                    try:
+                        # Extract the opus filename - try multiple patterns
+                        # Pattern 1: UUID-style like "e78b07cb-a66d-43b3-aa75-766ac54d2b45.opus"
+                        # Pattern 2: Any filename before .opus
+                        m_opus = re.search(r'([a-zA-Z0-9_\-]+\.opus)', source_info, flags=re.IGNORECASE)
+                        if m_opus:
+                            att_info = m_opus.group(1)
+                    except: pass
                 
                 # CROSS-REFERENCE LOOKUP
                 if attachment_lookup and ts_str:
@@ -622,12 +767,22 @@ class WhatsAppParser(BaseParser):
                 # Filter out known non-translation tags
                 ignore_tags = ["deleted", "read", "delivered", "sent", "cancellato", "letto", "consegnato", "inviato", "none", "nan"]
                 
-                if "Traduzione:" in trans_raw:
+                # Case-insensitive checks using regex
+                # This handles "Traduzione:", "traduzione:", "Translation:", "translation:"
+                m_trans = re.search(r'(?:Traduzione|Translation):', trans_raw, flags=re.IGNORECASE)
+                
+                if m_trans:
                     try:
-                        translation = trans_raw.split("Traduzione:", 1)[1]
+                        # Split using the regex match
+                        translation = re.split(r'(?:Traduzione|Translation):', trans_raw, maxsplit=1, flags=re.IGNORECASE)[1]
+                        
                         # Often followed by "Etichette:" or other fields
                         if "Etichette:" in translation:
                             translation = translation.split("Etichette:", 1)[0]
+                        if "Tags:" in translation:
+                            translation = translation.split("Tags:", 1)[0]
+                        if "Description:" in translation:
+                            translation = translation.split("Description:", 1)[0]
                         translation = clean_text(translation)
                     except: pass
                 elif "Descrizione:" in trans_raw:
@@ -636,15 +791,29 @@ class WhatsAppParser(BaseParser):
                         # Often followed by "Etichette:", "Creato:", "Modificato:"
                         if "Etichette:" in translation:
                             translation = translation.split("Etichette:", 1)[0]
+                        if "Tags:" in translation:
+                            translation = translation.split("Tags:", 1)[0]
+                        if "Description:" in translation:
+                            translation = translation.split("Description:", 1)[0]
                         if "Creato:" in translation:
                             translation = translation.split("Creato:", 1)[0]
+                        if "Created:" in translation:
+                            translation = translation.split("Created:", 1)[0]
                         translation = clean_text(translation)
+                        if not translation.strip(): translation = ""
                     except: pass
                 elif trans_raw.strip() and trans_raw.lower() not in ignore_tags:
                     # Fallback: Assume the whole tag is a translation if it's not a status tag
-                    # But exclude simple numbers or short codes
-                    if len(trans_raw) > 2 and not trans_raw.isdigit():
-                         translation = clean_text(trans_raw)
+                    
+                    # 1. Clean "Description:" or "Descrizione:" from START of string
+                    # e.g. "Description: Hello" -> "Hello"
+                    # e.g. "Description:" -> ""
+                    clean_trans = re.sub(r'^(?:Description|Descrizione):\s*', '', trans_raw, flags=re.IGNORECASE)
+                    
+                    # 2. Exclude simple numbers or short codes if resulting string is too short
+                    if len(clean_trans) > 2 and not clean_trans.isdigit():
+                         translation = clean_text(clean_trans)
+                         if not translation.strip(): translation = ""
 
                 chats[chat_id]["messages"].append({
                     "sender": sender,
@@ -787,19 +956,105 @@ class HTMLRenderer:
                             </div>
                             '''
                         elif ext in aud_exts:
-                            att_html = f'''
-                            <div class="attachment">
-                                <audio controls style="max-width:300px;">
-                                    <source src="{rel_path}">
-                                    <a href="{rel_path}">🎵 {basename}</a>
-                                </audio>
-                            </div>
-                            '''
+                            # Skip if handled by custom Opus player (Visual Waveform)
+                            is_special_opus = (ext == 'opus' and msg.get("trans") and not str(msg.get("body", "")).strip())
+                            
+                            if not is_special_opus:
+                                att_html = f'''
+                                <div class="attachment">
+                                    <audio controls style="max-width:300px;">
+                                        <source src="{rel_path}">
+                                        <a href="{rel_path}">🎵 {basename}</a>
+                                    </audio>
+                                </div>
+                                '''
                         else:
                             att_html = f'<div class="attachment"><a href="{rel_path}" target="_blank">📄 {basename}</a></div>'
                 
                 trans_html = ""
-                if msg["trans"]:
+                is_audio_transcription = False
+                
+                # Detect audio transcription: has translation and is likely audio
+                # Case 1: Has translation, no body, and opus attachment -> playable audio with transcription
+                # Case 2: Has translation, no body, no attachment -> visual-only transcription
+                
+                is_opus_audio = msg["att"] and ".opus" in str(msg["att"]).lower()
+                has_trans_only = msg["trans"] and not msg["body"].strip()
+                
+                if has_trans_only and is_opus_audio:
+                    # Playable audio with transcription
+                    is_audio_transcription = True
+                    
+                    # Get audio file path
+                    basename = os.path.basename(msg["att"])
+                    
+                    # Prepare Custom Audio UI
+                    text_len = len(msg["trans"])
+                    num_bars = max(20, min(150, int(text_len * 2.3)))
+                    waveform_spans = "<span></span>" * num_bars
+                    
+                    audio_element_id = f"audio-{chat_id}-{idx}"
+                    onclick_action = ""
+                    hidden_audio = ""
+                    dur_text = "Messaggio Vocale"
+                    
+                    if basename in self.file_map:
+                        rel_path = self.file_map[basename]
+                        # Playable
+                        onclick_action = f"onclick=\"playAudio(this, '{audio_element_id}')\""
+                        hidden_audio = f'<audio id="{audio_element_id}" src="{rel_path}" hidden></audio>'
+                    else:
+                        # Not found
+                        dur_text += " (Non trovato)"
+                        onclick_action = "style='opacity:0.5; cursor:default;'"
+                        
+                    audio_html = f'''
+                    <div class="audio-message">
+                        <div class="audio-play-btn" {onclick_action}></div>
+                        <div class="audio-waveform-container">
+                            <div class="audio-waveform">
+                                {waveform_spans}
+                            </div>
+                            <div class="audio-duration">{dur_text}</div>
+                        </div>
+                        {hidden_audio}
+                    </div>
+                    '''
+                    
+                    trans_html = f'''
+                    {audio_html}
+                    <div class="audio-label">Trascrizione:</div>
+                    <div class="translation">{msg["trans"]}</div>
+                    '''
+                elif has_trans_only and not msg["att"]:
+                    # Visual-only transcription (no audio file available)
+                    is_audio_transcription = True
+                    
+                    # Calculate waveform bars based on text length
+                    text_len = len(msg["trans"])
+                    num_bars = max(20, min(150, int(text_len * 2.3)))
+                    waveform_spans = "<span></span>" * num_bars
+                    
+                    audio_html = f'''
+                    <div class="audio-message">
+                        <div class="audio-play-btn" style="opacity:0.5; cursor:default;"></div>
+                        <div class="audio-waveform-container">
+                             <div class="audio-waveform">
+                                {waveform_spans}
+                            </div>
+                           <div class="audio-duration">Messaggio Vocale (file non disponibile)</div>
+                        </div>
+                    </div>
+                    '''
+
+                    trans_html = f'''
+                    {audio_html}
+                    <div class="audio-label">Trascrizione:</div>
+                    <div class="translation">{msg["trans"]}</div>
+                    '''
+                    
+
+                elif msg["trans"]:
                     trans_html = f'<div class="translation">{msg["trans"]}</div>'
                 
                 has_att_class = " has-attachment" if msg["att"] else ""
@@ -987,6 +1242,54 @@ class HTMLRenderer:
                 function closeSearch() {{
                     document.querySelector('.search-input').value = '';
                     performSearch('');
+                }}
+                
+                function playAudio(btn, audioId) {{
+                    var audio = document.getElementById(audioId);
+                    if (!audio) return;
+                    
+                    // Attach progress listener
+                    if (!audio.dataset.hasListener) {{
+                        audio.addEventListener('timeupdate', function() {{
+                             var pct = audio.currentTime / audio.duration;
+                             var container = btn.nextElementSibling;
+                             if(container && container.classList.contains('audio-waveform-container')) {{
+                                 var waveform = container.querySelector('.audio-waveform');
+                                 if(waveform) {{
+                                     var spans = waveform.children;
+                                     var total = spans.length;
+                                     var activeCount = Math.ceil(total * pct);
+                                     for(var i=0; i<total; i++) {{
+                                         if(i <= activeCount) spans[i].classList.add('played');
+                                         else spans[i].classList.remove('played');
+                                     }}
+                                 }}
+                             }}
+                        }});
+                        audio.dataset.hasListener = "true";
+                    }}
+                    
+                    if (audio.paused) {{
+                        try {{
+                           document.querySelectorAll('audio').forEach(function(a){{ if(a.id!==audioId) {{ a.pause(); }} }});
+                        }} catch(e){{}}
+                        
+                        audio.play();
+                        btn.classList.add('playing');
+                    }} else {{
+                        audio.pause();
+                        btn.classList.remove('playing');
+                    }}
+                    
+                    audio.onended = function() {{
+                        btn.classList.remove('playing');
+                    }};
+                    audio.onpause = function() {{
+                        btn.classList.remove('playing');
+                    }};
+                    audio.onplay = function() {{
+                        btn.classList.add('playing');
+                    }};
                 }}
             </script>
         </head>
