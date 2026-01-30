@@ -8,6 +8,7 @@ import argparse
 import shutil
 from datetime import datetime
 import openpyxl
+import json
 
 # ==========================================
 # CSS STYLES
@@ -67,6 +68,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxyge
 .audio-waveform span:nth-child(odd) { height: 60%; } .audio-waveform span:nth-child(even) { height: 100%; } .audio-waveform span:nth-child(3n) { height: 80%; } .audio-waveform span:nth-child(4n) { height: 45%; }
 .audio-duration { font-size: 11px; color: #666; font-weight: 500; }
 .message.sent .audio-duration { color: rgba(255,255,255,0.8); }
+.media-btn { cursor: pointer; padding: 6px 12px; border-radius: 6px; background: #e0e0e0; margin-left: 20px; font-weight: 500; font-size: 13px; display: flex; align-items: center; gap: 6px; border: 1px solid #ccc; }
+.media-btn:hover { background: #d0d0d0; }
+.media-icon-btn { cursor: pointer; margin-left: auto; padding: 8px; border-radius: 50%; background: transparent; color: #666; transition: all 0.2s; display: flex; align-items: center; justify-content: center; }
+.media-icon-btn:hover { background: #e8e8e8; color: #333; }
 .audio-label { font-size: 12px; color: #666; margin-top: 6px; font-style: italic; }
 .message.sent .audio-label { color: rgba(255,255,255,0.7); }
 .search-box { padding: 10px 15px; background-color: #f7f7f7; border-bottom: 1px solid #e6e6e6; }
@@ -314,6 +319,7 @@ def process_attachments(source_dir, output_dir):
             except Exception as e:
                 pass
                 
+    print(f"DEBUG: Scansione completata. Trovati {len(mapping)} file allegati.")
     return mapping
 
 # ==========================================
@@ -747,6 +753,33 @@ class WhatsAppParser(BaseParser):
                             att_info = m_opus.group(1)
                     except: pass
                 
+                # Check for Images/Videos if not yet found
+                # Check for Images/Videos if not yet found
+                if not att_info:
+                    try:
+                        # Common image/video extensions
+                        exts = r"(?:jpg|jpeg|png|gif|webp|bmp|heic|heif|tif|tiff|mp4|webm|mov|avi|mkv|3gp|m4v)"
+                        # Debug image detection
+                        if any(x in source_info.lower() for x in ['.jpg', '.jpeg', '.png', '.mp4']):
+                             print(f"DEBUG: Potential media checking: {source_info[:50]}...")
+                        
+                        # Regex for filename ending with extension
+                        # Try to capture more permissive filenames (allow spaces, parens)
+                        m_media = re.search(r'([^\\/:*?"<>|\r\n]+\.' + exts + r')', source_info, flags=re.IGNORECASE)
+                        if m_media:
+                            result = m_media.group(1).strip()
+                            # If result looks like a path, take basename
+                            if "/" in result or "\\" in result:
+                                result = os.path.basename(result)
+                            att_info = result
+                            print(f"DEBUG: Extracted media: {att_info}")
+                        else:
+                            if any(x in source_info.lower() for x in ['.jpg', '.jpeg', '.png', '.mp4']):
+                                print(f"DEBUG: Failed to extract media from: {source_info}")
+                    except Exception as e:
+                        print(f"DEBUG: Error extracting media: {e}")
+                        pass
+                
                 # CROSS-REFERENCE LOOKUP
                 if attachment_lookup and ts_str:
                      # Clean timestamp to match key
@@ -844,6 +877,7 @@ class HTMLRenderer:
     def render(self, chats, filename="index.html"):
         sidebar_html = ""
         chats_html = ""
+        all_media = {} # {chat_id: {images:[], videos:[], links:[]}}
         
         sorted_chat_ids = sorted(chats.keys())
         first = True
@@ -904,10 +938,39 @@ class HTMLRenderer:
             
             msgs_html = ""
             current_date_str = None
+            media_collector = {'images': [], 'videos': [], 'links': [], 'docs': []}
             
             for idx, msg in enumerate(msgs):
                 # Unique Message ID
                 msg_id = f"msg-{chat_id}-{idx}"
+                
+                # Media Collection
+                # Images/Videos
+                if msg["att"]:
+                    bname = os.path.basename(msg["att"])
+                    if bname in self.file_map:
+                        rpath = self.file_map[bname]
+                        _, ext_raw = os.path.splitext(bname)
+                        ext = ext_raw.replace('.', '').lower().strip()
+                        
+                        img_exts_c = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'heic']
+                        vid_exts_c = ['mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv']
+                        doc_exts_c = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'rtf', 'csv', 'zip', 'rar']
+                        
+                        if ext in img_exts_c:
+                            media_collector['images'].append({'src': rpath, 'name': bname, 'msg_id': msg_id})
+                        elif ext in vid_exts_c:
+                            media_collector['videos'].append({'src': rpath, 'name': bname, 'msg_id': msg_id})
+                        elif ext in doc_exts_c:
+                            media_collector['docs'].append({'src': rpath, 'name': bname, 'msg_id': msg_id, 'ext': ext})
+
+                # Links
+                try:
+                    urls = re.findall(r'(https?://[^\s]+)', msg['body'])
+                    for u in urls:
+                         media_collector['links'].append({'url': u, 'msg_id': msg_id})
+                except: pass
+
                 # Date Divider Logic
                 try:
                     msg_date = msg['time'][:10] 
@@ -943,16 +1006,14 @@ class HTMLRenderer:
                         if ext in img_exts:
                             att_html = f'''
                             <div class="attachment">
-                                <img src="{rel_path}" onclick="window.open(this.src)" title="{basename}" onerror="this.style.display='none'; this.parentNode.innerHTML='<a href={rel_path} target=_blank>📷 {basename} (Caricamento fallito)</a>'">
+                                <img src="{rel_path}" onclick="openLightbox('{rel_path}', 'image', '{basename}')" title="{basename}" style="cursor:pointer;" onerror="this.style.display='none'; this.parentNode.innerHTML='<a href={rel_path} target=_blank>📷 {basename} (Caricamento fallito)</a>'">
                             </div>
                             '''
                         elif ext in vid_exts:
                             att_html = f'''
-                            <div class="attachment">
-                                <video controls style="max-width:300px; max-height:300px; border-radius:10px;">
-                                    <source src="{rel_path}">
-                                    <a href="{rel_path}">📹 {basename}</a>
-                                </video>
+                            <div class="attachment video-attachment" onclick="openLightbox('{rel_path}', 'video', '{basename}')" style="cursor:pointer; position:relative;">
+                                <video src="{rel_path}" style="max-width:300px; max-height:300px; border-radius:10px; pointer-events:none;" preload="metadata"></video>
+                                <div class="video-play-overlay" style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:rgba(0,0,0,0.6); color:white; width:50px; height:50px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:20px;">▶</div>
                             </div>
                             '''
                         elif ext in aud_exts:
@@ -1093,6 +1154,14 @@ class HTMLRenderer:
                         <span class="participant-number">{contact_num_disp}</span>
                     </div>
                 </div>
+                
+                <div class="media-icon-btn" onclick="openGallery('chat-{chat_id}')" title="Media, Link e Documenti">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                        <circle cx="8.5" cy="8.5" r="1.5"/>
+                        <polyline points="21,15 16,10 5,21"/>
+                    </svg>
+                </div>
             </div>
             """
             
@@ -1102,6 +1171,7 @@ class HTMLRenderer:
                 {msgs_html}
             </div>
             """
+            all_media[f"chat-{chat_id}"] = media_collector
             
         # Decide Sidebar Header based on Style
         if self.style_mode == "whatsapp":
@@ -1312,6 +1382,185 @@ class HTMLRenderer:
                     {chats_html}
                 </div>
             </div>
+            <script>
+                // Media Gallery Logic
+                const allMedia = {json.dumps(all_media)};
+                let currentChatMedia = null;
+
+                function openGallery(chatId) {{
+                    currentChatMedia = allMedia[chatId];
+                    if(!currentChatMedia) return;
+                    
+                    document.getElementById('media-gallery-modal').style.display = 'flex';
+                    switchTab('media');
+                }}
+
+                function closeGallery() {{
+                    document.getElementById('media-gallery-modal').style.display = 'none';
+                }}
+
+                function switchTab(tab) {{
+                    document.querySelectorAll('.modal-tab').forEach(t => t.classList.remove('active'));
+                    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                    
+                    document.querySelector(`.modal-tab[data-tab="${{tab}}"]`).classList.add('active');
+                    document.getElementById('tab-' + tab).classList.add('active');
+                    
+                    if(tab === 'media') renderMedia();
+                    else if(tab === 'links') renderLinks();
+                    else if(tab === 'docs') renderDocs();
+                }}
+
+                function renderMedia() {{
+                    const grid = document.getElementById('gallery-grid');
+                    grid.innerHTML = '';
+                    const images = currentChatMedia.images || [];
+                    const videos = currentChatMedia.videos || [];
+                    
+                    if(images.length === 0 && videos.length === 0) {{
+                        grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:20px; color:#888;">Nessun media trovato.</div>';
+                        return;
+                    }}
+                    
+                    // Images
+                    images.forEach(item => {{
+                        const div = document.createElement('div');
+                        div.className = 'gallery-item';
+                        div.onclick = function() {{ openLightbox(item.src, 'image', item.name); }};
+                        div.innerHTML = `<img src="${{item.src}}" loading="lazy" title="${{item.name}}">`;
+                        grid.appendChild(div);
+                    }});
+                    
+                    // Videos with play icon overlay
+                    videos.forEach(item => {{
+                        const div = document.createElement('div');
+                        div.className = 'gallery-item video-item';
+                        div.onclick = function() {{ openLightbox(item.src, 'video', item.name); }};
+                        div.innerHTML = `<video src="${{item.src}}" preload="metadata"></video><div class="video-play-overlay">▶</div>`;
+                        grid.appendChild(div);
+                    }});
+                }}
+
+                function renderLinks() {{
+                    const list = document.getElementById('link-list');
+                    list.innerHTML = '';
+                    const items = currentChatMedia.links || [];
+                    
+                    if(items.length === 0) {{
+                        list.innerHTML = '<div style="text-align:center; padding:20px; color:#888;">Nessun link trovato.</div>';
+                        return;
+                    }}
+                    
+                    items.forEach(item => {{
+                        const li = document.createElement('li');
+                        li.innerHTML = `<a href="${{item.url}}" target="_blank">${{item.url}}</a>`;
+                        list.appendChild(li);
+                    }});
+                }}
+                
+                function renderDocs() {{
+                    const list = document.getElementById('docs-list');
+                    list.innerHTML = '';
+                    const items = currentChatMedia.docs || [];
+                    
+                    if(items.length === 0) {{
+                        list.innerHTML = '<div style="text-align:center; padding:20px; color:#888;">Nessun documento trovato.</div>';
+                        return;
+                    }}
+                    
+                    const icons = {{'pdf': '📕', 'doc': '📘', 'docx': '📘', 'xls': '📗', 'xlsx': '📗', 'ppt': '📙', 'pptx': '📙', 'txt': '📄', 'csv': '📊', 'zip': '📦', 'rar': '📦'}};
+                    
+                    items.forEach(item => {{
+                        const li = document.createElement('li');
+                        const icon = icons[item.ext] || '📎';
+                        li.innerHTML = `<span class="doc-icon">${{icon}}</span> <a href="${{item.src}}" target="_blank">${{item.name}}</a>`;
+                        list.appendChild(li);
+                    }});
+                }}
+                
+                // Lightbox
+                function openLightbox(src, type, name) {{
+                    const lb = document.getElementById('lightbox-overlay');
+                    const content = document.getElementById('lightbox-content');
+                    
+                    if(type === 'image') {{
+                        content.innerHTML = `<img src="${{src}}" alt="${{name}}">`;
+                    }} else if(type === 'video') {{
+                        content.innerHTML = `<video src="${{src}}" controls autoplay style="max-width:90vw; max-height:80vh;"></video>`;
+                    }}
+                    
+                    lb.style.display = 'flex';
+                }}
+                
+                function closeLightbox() {{
+                    const lb = document.getElementById('lightbox-overlay');
+                    const content = document.getElementById('lightbox-content');
+                    content.innerHTML = '';
+                    lb.style.display = 'none';
+                }}
+                
+                let currentChatId = "";
+                const originalOpen = openGallery;
+                openGallery = function(cid) {{ currentChatId = cid; originalOpen(cid); }};      
+            </script>
+            <style>
+            .modal-overlay {{ position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: flex; justify-content: center; align-items: center; z-index: 1000; backdrop-filter: blur(5px); }}
+            .modal-content {{ background: white; width: 80%; max-width: 900px; height: 80%; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }}
+            .modal-header {{ padding: 15px 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; background: #f9f9f9; }}
+            .modal-header h3 {{ margin: 0; font-size: 18px; color: #333; }}
+            .close-modal {{ font-size: 24px; cursor: pointer; color: #666; }} .close-modal:hover {{ color: #000; }}
+            .modal-tabs {{ display: flex; background: #f0f0f0; border-bottom: 1px solid #ddd; }}
+            .modal-tab {{ flex: 1; padding: 12px; text-align: center; cursor: pointer; border-bottom: 3px solid transparent; font-weight: 500; color: #666; font-size: 13px; }}
+            .modal-tab.active {{ border-bottom-color: #2c6bed; color: #2c6bed; background: white; }}
+            .modal-body {{ flex: 1; overflow-y: auto; padding: 20px; background: #fff; }}
+            .tab-content {{ display: none; }} .tab-content.active {{ display: block; }}
+            .gallery-grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; }}
+            .gallery-item {{ aspect-ratio: 1; background: #eee; border-radius: 6px; overflow: hidden; cursor: pointer; position: relative; border: 1px solid #ddd; }}
+            .gallery-item img, .gallery-item video {{ width: 100%; height: 100%; object-fit: cover; transition: transform 0.2s; }}
+            .gallery-item:hover img, .gallery-item:hover video {{ transform: scale(1.05); }}
+            .video-item .video-play-overlay {{ position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.6); color: white; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; pointer-events: none; }}
+            .link-list, .docs-list {{ list-style: none; padding: 0; margin: 0; }}
+            .link-list li, .docs-list li {{ padding: 12px 10px; border-bottom: 1px solid #eee; word-break: break-all; display: flex; align-items: center; gap: 10px; }}
+            .link-list li a, .docs-list li a {{ color: #2c6bed; text-decoration: none; }} .link-list li a:hover, .docs-list li a:hover {{ text-decoration: underline; }}
+            .doc-icon {{ font-size: 20px; }}
+            
+            /* Lightbox */
+            #lightbox-overlay {{ position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); display: none; justify-content: center; align-items: center; z-index: 2000; cursor: pointer; }}
+            #lightbox-content {{ max-width: 95vw; max-height: 95vh; }}
+            #lightbox-content img {{ max-width: 90vw; max-height: 85vh; border-radius: 4px; box-shadow: 0 5px 30px rgba(0,0,0,0.5); }}
+            #lightbox-close {{ position: fixed; top: 20px; right: 30px; font-size: 40px; color: white; cursor: pointer; z-index: 2001; }}
+            </style>
+            
+            <div id="media-gallery-modal" class="modal-overlay" style="display:none;">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>📂 Media Gallery</h3>
+                        <span class="close-modal" onclick="closeGallery()">&times;</span>
+                    </div>
+                    <div class="modal-tabs">
+                        <div class="modal-tab active" data-tab="media" onclick="switchTab('media')">📷 Media</div>
+                        <div class="modal-tab" data-tab="links" onclick="switchTab('links')">🔗 Link</div>
+                        <div class="modal-tab" data-tab="docs" onclick="switchTab('docs')">📎 Documenti</div>
+                    </div>
+                    <div class="modal-body">
+                        <div id="tab-media" class="tab-content active">
+                            <div id="gallery-grid" class="gallery-grid"></div>
+                        </div>
+                        <div id="tab-links" class="tab-content">
+                            <ul id="link-list" class="link-list"></ul>
+                        </div>
+                        <div id="tab-docs" class="tab-content">
+                            <ul id="docs-list" class="docs-list"></ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="lightbox-overlay" onclick="closeLightbox()">
+                <span id="lightbox-close">&times;</span>
+                <div id="lightbox-content"></div>
+            </div>
+            
         </body>
         </html>
         """
